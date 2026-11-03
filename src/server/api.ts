@@ -144,6 +144,28 @@ apiRouter.get('/auth/google/callback', async (req: Request, res: Response) => {
     res.status(500).send('Google sign-in failed. Please try again.');
   }
 });
+apiRouter.post('/auth/logout', (req: Request, res: Response) => {
+  if (!req.session) {
+    return res.json({ success: true });
+  }
+
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({
+        error: 'Logout failed'
+      });
+    }
+
+    res.clearCookie('transitnotice.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    });
+
+    return res.json({ success: true });
+  });
+});
 
 // A. HEALTH CHECK
 apiRouter.get('/health', (req: Request, res: Response) => {
