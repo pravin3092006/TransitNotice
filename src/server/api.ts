@@ -3,6 +3,8 @@ import { db } from './db.js';
 import { runScraperForSource, refreshAllSources } from './scrapers.js';
 import { processScrapedNotice, refreshAdvisoriesStatus, calculateAdvisoryStatus } from './changeDetector.js';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth.ts';
+import { OAuth2Client } from 'google-auth-library';
+import { randomBytes } from 'crypto';
 import {
   getOrCreateUser,
   getUserByUid,
@@ -13,6 +15,135 @@ import {
 } from '../db/users.ts';
 
 export const apiRouter = express.Router();
+// GOOGLE OAUTH CONFIGURATION
+const googleOAuthClient = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI ||
+    'https://transitnotice-12.onrender.com/api/auth/google/callback'
+);
+
+// START GOOGLE SIGN-IN
+apiRouter.get('/auth/google', (req: Request, res: Response) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(500).send('Google login is not configured.');
+  }
+
+  const state = randomBytes(32).toString('hex');
+  (req.session as any).googleOAuthState = state;
+
+  const authUrl = googleOAuthClient.generateAuthUrl({
+    access_type: 'online',
+    scope: ['openid', 'email', 'profile'],
+    prompt: 'select_account',
+    state
+  });
+
+  res.redirect(authUrl);
+});
+
+// GOOGLE SIGN-IN CALLBACK
+apiRouter.get('/auth/google/callback', async (req: Request, res: Response) => {
+  try {
+    const { code, state } = req.query;
+    const savedState = (req.session as any).googleOAuthState;
+
+    if (!code || typeof code !== 'string' ||
+        !state || typeof state !== 'string' ||
+        !savedState || state !== savedState) {
+      return res.status(400).send('Invalid Google login request.');
+    }
+
+    delete (req.session as any).googleOAuthState;
+
+    const { tokens } = await googleOAuthClient.getToken(code);
+
+    if (!tokens.id_token) {
+      return res.status(401).send('Google did not return an ID token.');
+    }
+
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const googleUser = ticket.getPayload();
+
+    if (!googleUser?.sub || !googleUser.email || googleUser.email_verified !== true) {
+      return res.status(401).send('Google account could not be verified.');
+    }
+
+    const email = googleUser.email.toLowerCase();
+    const name = googleUser.name || email.split('@')[0];
+    const photoUrl = googleUser.picture || null;
+
+    let user = db.prepare(
+      'SELECT * FROM user_profiles WHERE email = ?'
+    ).get(email) as any;
+
+    if (!user) {
+      const id = `USR-G-${randomBytes(6).toString('hex').toUpperCase()}`;
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        INSERT INTO user_profiles (
+          id, name, email, phone, persona, role_title,
+          home_station, work_station, preferred_agencies_json,
+          preferred_routes_json, alert_channels_json,
+          notification_frequency, bio, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        name,
+        email,
+        null,
+        'PASSENGER',
+        'Chennai Commuter',
+        'Kilambakkam (KCBT)',
+        'Chennai Central',
+        JSON.stringify(['MTC', 'CMRL']),
+        JSON.stringify(['21G', 'Blue-Line']),
+        JSON.stringify(['IN_APP']),
+        'REALTIME',
+        'Google authenticated account',
+        0,
+        now,
+        now
+      );
+
+      db.prepare(`
+        INSERT OR IGNORE INTO subscribers
+        (id, name, email, persona, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(id, name, email, 'PASSENGER', now);
+
+      user = db.prepare(
+        'SELECT * FROM user_profiles WHERE id = ?'
+      ).get(id) as any;
+    }
+
+    (req.session as any).user = {
+      uid: user.id,
+      email: user.email,
+      name: user.name,
+      googleId: googleUser.sub,
+      photoUrl
+    };
+
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save failed:', err);
+        return res.status(500).send('Could not save login session.');
+      }
+
+      res.redirect('/');
+    });
+
+  } catch (error) {
+    console.error('Google authentication error:', error);
+    res.status(500).send('Google sign-in failed. Please try again.');
+  }
+});
 
 // A. HEALTH CHECK
 apiRouter.get('/health', (req: Request, res: Response) => {
