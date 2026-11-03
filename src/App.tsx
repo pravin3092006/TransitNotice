@@ -40,19 +40,30 @@ function AppShell() {
   const [sourceNotice, setSourceNotice] = useState<TransitNotice | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
 
+  const [apiError, setApiError] = useState<string | null>(null);
+
   const loadAll = useCallback(async () => {
-    try {
-      const [s, n, notif] = await Promise.all([
-        api.getStats(),
-        api.getNotices({ limit: 8, sortBy: 'published_at', sortOrder: 'desc' }),
-        api.getNotifications(),
-      ]);
-      setStats(s);
-      setRecent(n.notices || []);
-      setNotifications(notif.notifications || []);
-      setUnread(notif.unreadCount || 0);
-    } catch (e) {
-      console.error('Failed to load app data', e);
+    const [s, n, notif] = await Promise.allSettled([
+      api.getStats(),
+      api.getNotices({ limit: 8, sortBy: 'published_at', sortOrder: 'desc' }),
+      api.getNotifications(),
+    ]);
+    if (s.status === 'fulfilled') setStats(s.value);
+    if (n.status === 'fulfilled') setRecent(n.value.notices || []);
+    if (notif.status === 'fulfilled') {
+      setNotifications(notif.value.notifications || []);
+      setUnread(notif.value.unreadCount || 0);
+    }
+    const failed = [s, n, notif].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (failed) {
+      const err: any = failed.reason;
+      const msg = err?.response
+        ? `HTTP ${err.response.status} from ${err.config?.url}`
+        : err?.message || 'Unknown error';
+      console.error('API load failed:', err);
+      setApiError(`Cannot reach backend API (${msg}). Make sure Render runs "npm start" as a Web Service.`);
+    } else {
+      setApiError(null);
     }
   }, []);
 
@@ -201,6 +212,11 @@ function AppShell() {
           onOpenAuthModal={() => setAuthOpen(true)}
           onNavigateTab={goTab}
         />
+        {apiError && (
+          <div className="mx-6 mt-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {apiError}
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto p-6">{renderPage()}</main>
       </div>
 
