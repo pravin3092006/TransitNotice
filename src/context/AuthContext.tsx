@@ -35,163 +35,109 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+axios.defaults.withCredentials = true;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [token] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchActiveProfile = async () => {
+  const clearUser = () => {
+    setFirebaseUser(null);
+    setDbUser(null);
+  };
+
+  const loadGoogleProfile = async () => {
     try {
-      const res = await axios.get('/api/users/active/current');
-      if (res.data?.user) {
-        const u = res.data.user;
-        const fbUser: FirebaseUser = {
-          uid: u.id,
-          email: u.email,
-          displayName: u.name,
-          photoURL: null,
-        };
-        setFirebaseUser(fbUser);
-        setDbUser({
-          id: u.id,
-          uid: u.id,
-          email: u.email,
-          name: u.name,
-          persona: u.persona,
-          role_title: u.role_title,
-          role: u.persona === 'OPERATIONS_MONITOR' ? 'Operations Monitor' : 'Commuter',
-        });
-        setToken(u.id);
-      } else {
-        // Fallback default commuter
-        const defaultUser: FirebaseUser = {
-          uid: 'USR-001',
-          email: 'maya.chennai@example.com',
-          displayName: 'Maya Lin',
-          photoURL: null,
-        };
-        setFirebaseUser(defaultUser);
-        setDbUser({
-          id: 'USR-001',
-          uid: 'USR-001',
-          email: 'maya.chennai@example.com',
-          name: 'Maya Lin',
-          persona: 'PASSENGER',
-          role: 'Commuter',
-        });
-        setToken('USR-001');
-      }
-    } catch {
-      const fallback: FirebaseUser = {
-        uid: 'USR-001',
-        email: 'maya.chennai@example.com',
-        displayName: 'Maya Lin',
-        photoURL: null,
-      };
-      setFirebaseUser(fallback);
-      setDbUser({
-        id: 'USR-001',
-        uid: 'USR-001',
-        email: 'maya.chennai@example.com',
-        name: 'Maya Lin',
-        persona: 'PASSENGER',
-        role: 'Commuter',
+      const res = await axios.get('/api/auth/me', {
+        withCredentials: true
       });
-      setToken('USR-001');
+
+      const u = res.data?.user;
+
+      if (!u) {
+        clearUser();
+        return;
+      }
+
+      setFirebaseUser({
+        uid: u.id,
+        email: u.email,
+        displayName: u.name,
+        photoURL: u.photoUrl || null
+      });
+
+      setDbUser({
+        id: u.id,
+        uid: u.id,
+        email: u.email,
+        name: u.name,
+        photoUrl: u.photoUrl || null,
+        persona: u.persona || 'PASSENGER',
+        role_title: u.role_title,
+        role: u.persona === 'OPERATIONS_MONITOR'
+          ? 'Operations Monitor'
+          : 'Commuter'
+      });
+    } catch {
+      clearUser();
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchActiveProfile();
+    loadGoogleProfile();
   }, []);
 
+  // Start Google account chooser
   const loginWithGoogle = async () => {
-    // Quick login with demo officer or commuter
-    await fetchActiveProfile();
+    window.location.href = '/api/auth/google';
   };
 
-  const signupWithEmail = async (email: string, _pass: string, name: string) => {
-    try {
-      const res = await axios.post('/api/users', {
-        name,
-        email,
-        persona: 'PASSENGER',
-        role_title: 'Chennai Commuter',
-      });
-      if (res.data?.user) {
-        const u = res.data.user;
-        setFirebaseUser({
-          uid: u.id,
-          email: u.email,
-          displayName: u.name,
-          photoURL: null,
-        });
-        setDbUser({
-          id: u.id,
-          uid: u.id,
-          email: u.email,
-          name: u.name,
-          persona: u.persona,
-          role: 'Commuter',
-        });
-      }
-    } catch (err: any) {
-      console.error('Signup error:', err);
-      throw new Error(err.response?.data?.error || 'Registration failed');
-    }
+  // Email login is disabled until secure password authentication is implemented.
+  const signupWithEmail = async (
+    _email: string,
+    _pass: string,
+    _name: string
+  ) => {
+    throw new Error('Please use Continue with Google to create your account.');
   };
 
-  const loginWithEmail = async (email: string, _pass: string) => {
-    try {
-      const res = await axios.get('/api/users');
-      const found = res.data?.users?.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-      if (found) {
-        await axios.post(`/api/users/${found.id}/activate`);
-        setFirebaseUser({
-          uid: found.id,
-          email: found.email,
-          displayName: found.name,
-          photoURL: null,
-        });
-        setDbUser({
-          id: found.id,
-          uid: found.id,
-          email: found.email,
-          name: found.name,
-          persona: found.persona,
-          role: found.persona === 'OPERATIONS_MONITOR' ? 'Operations Monitor' : 'Commuter',
-        });
-      } else {
-        await signupWithEmail(email, '', email.split('@')[0]);
-      }
-    } catch (err: any) {
-      console.error('Login error:', err);
-      throw new Error(err.message || 'Login failed');
-    }
+  const loginWithEmail = async (
+    _email: string,
+    _pass: string
+  ) => {
+    throw new Error('Please use Continue with Google to sign in.');
   };
 
   const logout = async () => {
-    setFirebaseUser(null);
-    setDbUser(null);
-    setToken(null);
+    try {
+      await axios.post('/api/auth/logout', {}, {
+        withCredentials: true
+      });
+    } finally {
+      clearUser();
+      window.location.href = '/';
+    }
   };
 
-  const setPersona = async (persona: 'PASSENGER' | 'OPERATIONS_MONITOR') => {
+  const setPersona = async (
+    persona: 'PASSENGER' | 'OPERATIONS_MONITOR'
+  ) => {
+    await axios.put('/api/auth/persona', { persona }, {
+      withCredentials: true
+    });
+
     if (dbUser) {
-      try {
-        await axios.put(`/api/users/${dbUser.id}`, { persona });
-        setDbUser({ ...dbUser, persona });
-      } catch {
-        setDbUser({ ...dbUser, persona });
-      }
+      setDbUser({ ...dbUser, persona });
     }
   };
 
   const refreshProfile = async () => {
-    await fetchActiveProfile();
+    setLoading(true);
+    await loadGoogleProfile();
   };
 
   return (
@@ -206,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithEmail,
         logout,
         setPersona,
-        refreshProfile,
+        refreshProfile
       }}
     >
       {children}
@@ -216,8 +162,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };
