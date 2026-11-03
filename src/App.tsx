@@ -201,7 +201,14 @@ function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           currentPersona={persona}
-          onPersonaChange={setPersona}
+          onPersonaChange={(nextPersona) => {
+  setPersona(nextPersona);
+  setTab(
+    nextPersona === 'PASSENGER'
+      ? 'passenger'
+      : 'dashboard'
+  );
+}}
           onSearchSubmit={doSearch}
           onRefreshClick={refresh}
           isRefreshing={refreshing}
