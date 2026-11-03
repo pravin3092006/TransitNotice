@@ -5,8 +5,6 @@ import {
   RefreshCw,
   UserCheck,
   ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
   User,
   LogOut,
   LogIn,
@@ -44,18 +42,22 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigateTab
 }) => {
   const { firebaseUser, dbUser, logout, setPersona } = useAuth();
+
   const [searchValue, setSearchValue] = useState('');
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      onSearchSubmit(searchValue);
+    if (e.key === 'Enter' && searchValue.trim()) {
+      onSearchSubmit(searchValue.trim());
     }
   };
 
-  const handleSwitchPersona = async (p: 'PASSENGER' | 'OPERATIONS_MONITOR') => {
+  const handleSwitchPersona = async (
+    p: 'PASSENGER' | 'OPERATIONS_MONITOR'
+  ) => {
     onPersonaChange(p);
+
     try {
       await setPersona(p);
     } catch (e) {
@@ -64,230 +66,283 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur-md sm:px-6 lg:px-8">
-      {/* Search Bar */}
-      <div className="flex flex-1 items-center max-w-md">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search routes, corridors, notices (e.g. 21G, 102, 570, Blue Line, Kilambakkam, OMR)..."
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onKeyDown={handleSearchKey}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-4 text-sm text-slate-800 placeholder-slate-400 transition-colors focus:border-[#13BCEB] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#13BCEB]"
-          />
-        </div>
-      </div>
+    <header className="sticky top-0 z-30 w-full border-b border-slate-200 bg-white/95 backdrop-blur-md">
+      <div className="flex min-h-16 w-full flex-wrap items-center justify-between gap-2 px-2 py-2 pl-16 sm:flex-nowrap sm:gap-3 sm:px-6 lg:px-8">
 
-      {/* Right controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Scraper Manual Refresh */}
-        <button
-          onClick={onRefreshClick}
-          disabled={isRefreshing}
-          title="Manual refresh of permitted transport sources"
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 text-[#13BCEB] ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span className="hidden md:inline">{isRefreshing ? 'Checking Feeds...' : 'Sync Feeds'}</span>
-        </button>
+        {/* Right controls */}
+        <div className="order-1 flex min-w-0 flex-1 items-center justify-end gap-1 sm:order-2 sm:flex-none sm:gap-3">
 
-        {/* Persona Switcher (Passenger vs Ops Controller) */}
-        <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs shadow-2xs">
+          {/* Refresh */}
           <button
             type="button"
-            onClick={() => handleSwitchPersona('PASSENGER')}
-            className={`flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 font-bold transition cursor-pointer ${
-              currentPersona === 'PASSENGER'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-            title="Daily Passenger Commuter Mode"
+            onClick={onRefreshClick}
+            disabled={isRefreshing}
+            title="Refresh transport sources"
+            aria-label="Refresh feeds"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 sm:px-3 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
           >
-            <UserCheck className="h-3.5 w-3.5" />
-            <span className="inline text-[11px] sm:text-xs">Passenger</span>
+            <RefreshCw
+              className={`h-4 w-4 text-[#13BCEB] ${
+                isRefreshing ? 'animate-spin' : ''
+              }`}
+            />
+            <span className="hidden lg:inline">
+              {isRefreshing ? 'Checking...' : 'Sync Feeds'}
+            </span>
           </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchPersona('OPERATIONS_MONITOR')}
-            className={`flex items-center gap-1 rounded-md px-2 sm:px-2.5 py-1 font-bold transition cursor-pointer ${
-              currentPersona === 'OPERATIONS_MONITOR'
-                ? 'bg-[#071B2D] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-            }`}
-            title="Operations Controller Mode"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" />
-            <span className="hidden sm:inline text-[11px] sm:text-xs">Ops</span>
-          </button>
-        </div>
 
-        {/* User Profiles DB Shortcut */}
-        {onNavigateTab && (
-          <button
-            onClick={() => onNavigateTab('users')}
-            className="hidden sm:flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-50/70 hover:bg-cyan-100 px-2.5 py-1.5 text-xs font-bold text-cyan-900 transition cursor-pointer"
-            title="Manage User Profiles stored in SQLite Database"
-          >
-            <User className="h-3.5 w-3.5 text-cyan-600" />
-            <span>Profiles DB</span>
-          </button>
-        )}
-
-        {/* User Account Button / Dropdown */}
-        {firebaseUser ? (
-          <div className="relative">
+          {/* Passenger / Ops */}
+          <div className="flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-800 hover:bg-slate-100 transition"
+              type="button"
+              onClick={() => handleSwitchPersona('PASSENGER')}
+              aria-label="Passenger mode"
+              aria-pressed={currentPersona === 'PASSENGER'}
+              className={`flex h-8 items-center justify-center gap-1 rounded-md px-2 sm:px-2.5 font-bold transition ${
+                currentPersona === 'PASSENGER'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
             >
-              {firebaseUser.photoURL ? (
-                <img
-                  src={firebaseUser.photoURL}
-                  alt={firebaseUser.displayName || 'User'}
-                  className="h-5 w-5 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#071B2D] text-[10px] font-bold text-white">
-                  {(firebaseUser.displayName || firebaseUser.email || 'U')[0].toUpperCase()}
-                </div>
-              )}
-              <span className="hidden md:inline max-w-[100px] truncate">
-                {firebaseUser.displayName || firebaseUser.email?.split('@')[0]}
-              </span>
-              <ChevronDown className="h-3 w-3 text-slate-400" />
+              <UserCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Passenger</span>
             </button>
 
-            {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl z-50 animate-in fade-in">
-                <div className="border-b border-slate-100 pb-2 mb-2">
-                  <p className="text-xs font-bold text-slate-900 truncate">
-                    {firebaseUser.displayName || 'Signed In User'}
-                  </p>
-                  <p className="text-[11px] text-slate-500 truncate">{firebaseUser.email}</p>
-                  <div className="mt-1.5 flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-mono">
-                    <Database className="h-3 w-3" />
-                    <span>Cloud SQL: ID #{dbUser?.id || 'synced'}</span>
+            <button
+              type="button"
+              onClick={() => handleSwitchPersona('OPERATIONS_MONITOR')}
+              aria-label="Operations mode"
+              aria-pressed={currentPersona === 'OPERATIONS_MONITOR'}
+              className={`flex h-8 items-center justify-center gap-1 rounded-md px-2 sm:px-2.5 font-bold transition ${
+                currentPersona === 'OPERATIONS_MONITOR'
+                  ? 'bg-[#071B2D] text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4 text-cyan-500" />
+              <span className="hidden sm:inline">Ops</span>
+            </button>
+          </div>
+
+          {/* Profiles */}
+          {onNavigateTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('users')}
+              aria-label="Profiles database"
+              className="hidden lg:flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-50 px-2.5 py-2 text-xs font-bold text-cyan-900 hover:bg-cyan-100"
+            >
+              <User className="h-4 w-4 text-cyan-600" />
+              Profiles DB
+            </button>
+          )}
+
+          {/* Account */}
+          {firebaseUser ? (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUserMenu(!showUserMenu);
+                  setShowNotifMenu(false);
+                }}
+                aria-label="Account menu"
+                className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs text-slate-800 hover:bg-slate-100"
+              >
+                {firebaseUser.photoURL ? (
+                  <img
+                    src={firebaseUser.photoURL}
+                    alt={firebaseUser.displayName || 'User'}
+                    className="h-6 w-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#071B2D] text-[10px] font-bold text-white">
+                    {(firebaseUser.displayName || firebaseUser.email || 'U')[0].toUpperCase()}
+                  </div>
+                )}
+
+                <span className="hidden lg:inline max-w-[100px] truncate">
+                  {firebaseUser.displayName || firebaseUser.email?.split('@')[0]}
+                </span>
+
+                <ChevronDown className="h-3 w-3 text-slate-400" />
+              </button>
+
+              {showUserMenu && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-[min(270px,calc(100vw-20px))] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                  <div className="mb-2 border-b border-slate-100 pb-2">
+                    <p className="truncate text-xs font-bold text-slate-900">
+                      {firebaseUser.displayName || 'Signed In User'}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {firebaseUser.email}
+                    </p>
+
+                    <div className="mt-2 flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-[10px] text-emerald-700">
+                      <Database className="h-3 w-3" />
+                      Cloud SQL: ID #{dbUser?.id || 'synced'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-xs">
+                    <p className="px-2 py-1 text-slate-500">
+                      Role: <strong className="text-slate-800">{dbUser?.role || 'user'}</strong>
+                    </p>
+                    <p className="px-2 py-1 text-slate-500">
+                      Persona: <strong className="text-slate-800">{currentPersona}</strong>
+                    </p>
+                  </div>
+
+                  <div className="mt-2 border-t border-slate-100 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        logout();
+                        setShowUserMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </button>
                   </div>
                 </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAuthModal}
+              className="flex h-9 shrink-0 items-center gap-1 rounded-lg bg-[#071B2D] px-2 sm:px-3 text-xs font-bold text-white hover:bg-slate-800"
+            >
+              <LogIn className="h-4 w-4 text-[#13BCEB]" />
+              <span className="hidden sm:inline">Sign In / Up</span>
+              <span className="sm:hidden">Login</span>
+            </button>
+          )}
 
-                <div className="space-y-1 text-xs">
-                  <div className="px-2 py-1 text-[11px] text-slate-500">
-                    Role: <strong className="text-slate-800 uppercase">{dbUser?.role || 'user'}</strong>
+          {/* Notifications */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNotifMenu(!showNotifMenu);
+                setShowUserMenu(false);
+              }}
+              aria-label={`Notifications, ${unreadCount} unread`}
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifMenu && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-16px))] rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase text-slate-800">
+                      Advisory Alerts
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] text-cyan-800">
+                        {unreadCount} unread
+                      </span>
+                    )}
                   </div>
-                  <div className="px-2 py-1 text-[11px] text-slate-500">
-                    Persona: <strong className="text-slate-800">{currentPersona}</strong>
-                  </div>
+
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={onMarkAllRead}
+                      className="shrink-0 text-[11px] font-medium text-[#13BCEB] hover:underline"
+                    >
+                      Mark all read
+                    </button>
+                  )}
                 </div>
 
-                <div className="border-t border-slate-100 pt-2 mt-2">
+                <div className="max-h-72 space-y-2 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-slate-400">
+                      No notifications yet.
+                    </div>
+                  ) : (
+                    notifications.slice(0, 8).map((notif) => (
+                      <button
+                        type="button"
+                        key={notif.id}
+                        onClick={() => {
+                          onNotificationClick(notif);
+                          setShowNotifMenu(false);
+                        }}
+                        className={`w-full rounded-lg p-2.5 text-left text-xs transition ${
+                          notif.is_read
+                            ? 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            : 'border-l-4 border-[#13BCEB] bg-cyan-50/60 font-medium text-slate-800 hover:bg-cyan-100'
+                        }`}
+                      >
+                        <div className="mb-1 flex items-center justify-between text-[10px] text-slate-400">
+                          <span className="font-semibold text-cyan-700">
+                            {notif.event_type.replace('_', ' ')}
+                          </span>
+                          <span>
+                            {new Date(notif.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="line-clamp-1 font-semibold text-slate-900">
+                          {notif.title}
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">
+                          {notif.message}
+                        </p>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-2 border-t border-slate-100 pt-2 text-center">
                   <button
+                    type="button"
                     onClick={() => {
-                      logout();
-                      setShowUserMenu(false);
+                      onNavigateTab?.('notifications');
+                      setShowNotifMenu(false);
                     }}
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition"
+                    className="text-xs font-medium text-[#13BCEB] hover:underline"
                   >
-                    <LogOut className="h-3.5 w-3.5" />
-                    <span>Sign Out</span>
+                    View all alerts & delivery logs
                   </button>
                 </div>
               </div>
             )}
           </div>
-        ) : (
-          <button
-            onClick={onOpenAuthModal}
-            className="flex items-center gap-1.5 rounded-lg bg-[#071B2D] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition shadow-xs"
-          >
-            <LogIn className="h-3.5 w-3.5 text-[#13BCEB]" />
-            <span>Sign In / Up</span>
-          </button>
-        )}
 
-        {/* Notification Bell */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifMenu(!showNotifMenu)}
-            className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
-            title="Advisory Alerts & Notifications"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-xs">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-
-          {/* Notifications Dropdown */}
-          {showNotifMenu && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl border border-slate-200 bg-white p-3 shadow-xl z-50">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Advisory Alerts</span>
-                  {unreadCount > 0 && (
-                    <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-semibold text-cyan-800">
-                      {unreadCount} unread
-                    </span>
-                  )}
-                </div>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={onMarkAllRead}
-                    className="text-[11px] font-medium text-[#13BCEB] hover:underline"
-                  >
-                    Mark all read
-                  </button>
-                )}
-              </div>
-
-              <div className="max-h-72 overflow-y-auto space-y-2">
-                {notifications.length === 0 ? (
-                  <div className="py-6 text-center text-xs text-slate-400">
-                    No notifications yet.
-                  </div>
-                ) : (
-                  notifications.slice(0, 8).map((notif) => (
-                    <div
-                      key={notif.id}
-                      onClick={() => {
-                        onNotificationClick(notif);
-                        setShowNotifMenu(false);
-                      }}
-                      className={`cursor-pointer rounded-lg p-2.5 transition text-left text-xs ${
-                        notif.is_read ? 'bg-slate-50 hover:bg-slate-100 text-slate-600' : 'bg-cyan-50/60 hover:bg-cyan-100/50 text-slate-800 font-medium border-l-3 border-[#13BCEB]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                        <span className="font-semibold text-cyan-700">{notif.event_type.replace('_', ' ')}</span>
-                        <span>{new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <p className="font-semibold text-slate-900 line-clamp-1">{notif.title}</p>
-                      <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{notif.message}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="border-t border-slate-100 pt-2 mt-2 text-center">
-                <a
-                  href="#/notifications"
-                  onClick={() => setShowNotifMenu(false)}
-                  className="text-xs font-medium text-[#13BCEB] hover:underline"
-                >
-                  View all alerts & delivery logs →
-                </a>
-              </div>
-            </div>
-          )}
+          {/* Feed Status */}
+          <div className="hidden xl:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            Feeds Live
+          </div>
         </div>
 
-        {/* Live Feed Status Chip */}
-        <div className="hidden xl:flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Feeds Live</span>
+        {/* Search */}
+        <div className="order-2 flex w-full min-w-0 items-center sm:order-1 sm:w-auto sm:max-w-md sm:flex-1">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              placeholder="Search routes or notices..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              onKeyDown={handleSearchKey}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 focus:border-[#13BCEB] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#13BCEB]"
+            />
+          </div>
         </div>
       </div>
     </header>
